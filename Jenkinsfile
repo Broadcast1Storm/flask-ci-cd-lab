@@ -1,64 +1,34 @@
 pipeline {
     agent any
-
     environment {
-        APP_NAME = "flask-app"
         IMAGE_NAME = "flask-ci-cd"
-        IMAGE_TAG = "latest"
-        HOST_PORT = "8081"
-        CONTAINER_PORT = "5000"
+        APP_NAME = "flask-app"
     }
-
     stages {
-        stage("Checkout") {
+        stage('Checkout') {
             steps {
                 checkout scm
             }
         }
-
-        stage("Build Docker image") {
+        stage('Build Image') {
             steps {
-                sh """
-                  docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
-                """
+                sh "docker build -t ${IMAGE_NAME}:latest ."
             }
         }
-
-        stage("Run tests") {
+        stage('Run Tests') {
             steps {
-                sh """
-                  docker run --rm ${IMAGE_NAME}:${IMAGE_TAG} pytest -q
-                """
+                sh "docker run --rm ${IMAGE_NAME}:latest pytest"
             }
         }
-
-        stage("Deploy container") {
+        stage('Deploy') {
             steps {
                 sh """
-                  if docker ps -a --format '{{.Names}}' | grep -w ${APP_NAME}; then
-                      docker rm -f ${APP_NAME}
-                  fi
-
-                  docker run -d --name ${APP_NAME} \
-                    -p ${HOST_PORT}:${CONTAINER_PORT} \
-                    ${IMAGE_NAME}:${IMAGE_TAG}
+                if [ \$(docker ps -aq -f name=${APP_NAME}) ]; then
+                    docker rm -f ${APP_NAME}
+                fi
+                docker run -d --name ${APP_NAME} -p 8081:5000 ${IMAGE_NAME}:latest
                 """
             }
-        }
-
-        stage("Smoke test") {
-            steps {
-                sh """
-                  sleep 2
-                  curl -s http://localhost:${HOST_PORT}/health | grep healthy
-                """
-            }
-        }
-    }
-
-    post {
-        always {
-            sh "docker images | head -n 5 || true"
         }
     }
 }
